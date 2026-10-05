@@ -73,7 +73,7 @@ function createServer(cfg) {
     if (isMuted(key)) throw fail(429, 'muted');
     if (limited(`sub:${kind}:${key}`, 1, 30000) || limited(`subs:${key}`, 8, 600000)) throw fail(429, 'rate_limited');
     const text = clean(rawText);
-    const result = await moderate(text, { kind, apiKey: cfg.anthropicKey });
+    const result = await moderate(text, { kind, ...aiOptions(cfg) });
     if (!result.ok) { addStrike(key); throw Object.assign(fail(422, 'blocked'), { reason: result.reason }); }
     const userName = await twitch.displayName(cfg, me.userId); // Twitch rule 7.3: show the username
     return add({ text, userId: me.userId, userName });
@@ -107,7 +107,7 @@ function createServer(cfg) {
         ...store.view(cid, me.userId),
         you: { role: me.role, linked: !!me.userId },
         catalog: { dares: PAID_DARES, boosts: GOAL_BOOSTS, majors: MAJOR_DARES },
-        aiOn: !!cfg.anthropicKey,
+        aiOn: !!(cfg.geminiKey || cfg.anthropicKey),
       });
     }
     if (req.method !== 'POST') throw fail(405, 'method');
@@ -177,10 +177,16 @@ function send(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
+function aiOptions(cfg) {
+  if (cfg.geminiKey) return { provider: 'gemini', apiKey: cfg.geminiKey, model: cfg.geminiModel };
+  return { provider: 'anthropic', apiKey: cfg.anthropicKey };
+}
+
 function configFromEnv(env = process.env) {
   return {
-    secret: env.EXTENSION_SECRET, clientId: env.EXTENSION_CLIENT_ID, ownerId: env.EXTENSION_OWNER_ID,
+    secret: env.EXTENSION_SECRET, clientId: env.EXTENSION_CLIENT_ID, ownerId: env.EXTENSION_OWNER_ID, ownerLogin: env.EXTENSION_OWNER_LOGIN,
     clientSecret: env.TWITCH_CLIENT_SECRET, anthropicKey: env.ANTHROPIC_API_KEY,
+    geminiKey: env.GEMINI_API_KEY, geminiModel: env.GEMINI_MODEL || 'gemini-3.5-flash',
     dataFile: env.DATA_FILE, devMode: env.DEV_MODE === 'true',
   };
 }
@@ -189,7 +195,7 @@ if (require.main === module) {
   const cfg = configFromEnv();
   if (!cfg.secret && !cfg.devMode) console.warn('WARNING: EXTENSION_SECRET is not set. Every request will be rejected.');
   if (cfg.devMode) console.warn('WARNING: DEV_MODE is on. Never use this online.');
-  if (!cfg.anthropicKey) console.warn('Note: ANTHROPIC_API_KEY not set. Using local safety rules only.');
+  if (!cfg.geminiKey && !cfg.anthropicKey) console.warn('Note: no GEMINI_API_KEY set. Using local safety rules only.');
   const port = process.env.PORT || 8080;
   createServer(cfg).listen(port, () => console.log('ChallengeLive backend running on port ' + port));
 }
