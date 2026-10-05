@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: challengelive
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: DEV_MODE
+        value: "false"
+      - key: EXTENSION_SECRET
+        sync: false
+      - key: EXTENSION_CLIENT_ID
+        sync: false
+      - key: EXTENSION_OWNER_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
